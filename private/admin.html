@@ -1,0 +1,414 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Admin Dashboard</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ... (Dein bisheriger Style) ... */
+      body {
+        background: linear-gradient(135deg, #050505 0%, #130821 100%);
+        color: #eee;
+        font-family: "Rubik", sans-serif;
+        padding: 20px;
+        margin: 0;
+        min-height: 100vh;
+      }
+      h1 {
+        text-align: center;
+        text-transform: uppercase;
+        margin-bottom: 30px;
+        text-shadow: 0 0 10px #8a2be2;
+      }
+      h3 {
+        margin-top: 0;
+        border-bottom: 1px solid #333;
+        padding-bottom: 10px;
+        color: #ccc;
+      }
+
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .card {
+        background: rgba(20, 20, 20, 0.6);
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        display: flex;
+        flex-direction: column;
+      }
+
+      input[type="text"],
+      input[type="number"],
+      select {
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 10px;
+        background: #111;
+        border: 1px solid #444;
+        color: white;
+        border-radius: 6px;
+        box-sizing: border-box;
+        font-family: "Rubik", sans-serif;
+      }
+      button {
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-weight: 700;
+        color: white;
+        border: none;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: filter 0.2s;
+        margin-right: 2px;
+        margin-bottom: 2px;
+      }
+      button:hover {
+        filter: brightness(1.2);
+      }
+      .btn-dark {
+        background: #333;
+      }
+      .btn-green {
+        background: #2e7d32;
+      }
+      .btn-blue {
+        background: #1565c0;
+      }
+      .btn-red {
+        background: #c62828;
+        width: 100%;
+        padding: 15px;
+      }
+      .btn-purple {
+        background: #8a2be2;
+        width: 100%;
+      }
+      .btn-action {
+        width: 100%;
+        margin-bottom: 5px;
+      }
+
+      /* STYLES FÜR INBOX */
+      #inbox-list {
+        max-height: 300px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .msg-item {
+        background: #222;
+        padding: 10px;
+        border-radius: 6px;
+        border-left: 3px solid #f44336;
+        animation: flash 1s;
+      }
+      .msg-header {
+        font-size: 0.8rem;
+        color: #aaa;
+        display: flex;
+        justify-content: space-between;
+      }
+      .msg-text {
+        margin: 5px 0;
+        font-size: 1rem;
+        color: white;
+      }
+      .reply-area {
+        display: flex;
+        gap: 5px;
+        margin-top: 5px;
+      }
+      @keyframes flash {
+        from {
+          background: #500;
+        }
+        to {
+          background: #222;
+        }
+      }
+
+      /* ... (Restliche Styles für Spielerliste etc.) ... */
+      .player-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.05);
+        margin-bottom: 8px;
+        border-radius: 8px;
+      }
+      .outsider-row {
+        border: 2px solid #c62828;
+        background: rgba(198, 40, 40, 0.1);
+      }
+      .preview-thumb {
+        height: 50px;
+        width: 80px;
+        background: white;
+        object-fit: contain;
+        border-radius: 4px;
+        border: 1px solid #555;
+        margin-right: 10px;
+      }
+      .info-box {
+        background: rgba(33, 150, 243, 0.1);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        border-left: 4px solid #2196f3;
+        font-size: 0.9rem;
+      }
+      #host-preview {
+        width: 100%;
+        aspect-ratio: 16/9;
+        background: #000;
+        margin-top: 10px;
+        border-radius: 6px;
+      }
+      #host-preview iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <h1>Admin Control</h1>
+
+    <div class="dashboard-grid">
+      <div class="column">
+        <div class="card" style="margin-bottom: 20px">
+          <h3>Runden Status</h3>
+          <div class="info-box">
+            <div>
+              Inno: <span id="infoInno" style="font-weight: bold">-</span>
+            </div>
+            <div>
+              Out: <span id="infoOut" style="font-weight: bold">-</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px">
+            <button
+              class="btn-green"
+              style="flex: 1"
+              onclick="socket.emit('startTimer')"
+            >
+              ▶ TIMER
+            </button>
+            <button
+              class="btn-red"
+              style="flex: 1; padding: 8px"
+              onclick="socket.emit('stopTimer')"
+            >
+              ⏹ STOP
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Host Kamera</h3>
+          <button class="btn-purple" onclick="startHostCam()">
+            KAMERA SETUP
+          </button>
+          <div id="host-preview"></div>
+        </div>
+      </div>
+
+      <div class="column">
+        <div class="card">
+          <h3>Neue Runde</h3>
+          <select id="imposterCount">
+            <option value="0">0 (Niemand)</option>
+            <option value="1" selected>1 (Standard)</option>
+            <option value="2">2 (50/50)</option>
+            <option value="3">3 (Mobbing)</option>
+            <option value="4">4 (Alle)</option>
+          </select>
+          <input id="qInno" type="text" placeholder="Frage Unschuldige" />
+          <input id="qOut" type="text" placeholder="Frage Außenseiter" />
+          <button class="btn-red" onclick="startRound()">
+            STARTEN & RESET
+          </button>
+        </div>
+
+        <div class="card" style="margin-top: 20px">
+          <h3>Show Control</h3>
+          <button
+            class="btn-blue btn-action"
+            onclick="socket.emit('revealQuestion')"
+          >
+            1. FRAGE AUFDECKEN
+          </button>
+          <button
+            class="btn-red btn-action"
+            onclick="socket.emit('revealRoles')"
+          >
+            2. AUFLÖSEN
+          </button>
+        </div>
+      </div>
+
+      <div class="column">
+        <div
+          class="card"
+          style="margin-bottom: 20px; border: 1px solid #2196f3"
+        >
+          <h3 style="color: #64b5f6">📬 Inbox / Fragen</h3>
+          <div id="inbox-list">
+            <div style="color: #666; font-style: italic">
+              Keine neuen Nachrichten.
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Spieler</h3>
+          <div id="playerList"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const socket = io({
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+      });
+
+      // Wachmacher für Admin
+      setInterval(() => {
+        if (socket.connected) socket.emit("ping");
+      }, 15000);
+
+      socket.on("connect", () => {
+        // Admin muss sich neu registrieren für Updates
+        socket.emit("requestRoundInfo");
+        socket.emit("requestPlayerListUpdate");
+
+        // Wenn du Host warst, setz dich wieder als Host
+        if (typeof hostStreamId !== "undefined") {
+          socket.emit("setHostId", hostStreamId);
+        }
+      });
+      let currentOutsiderIds = [];
+      const hostStreamId = "host_" + Math.random().toString(36).substr(2, 9);
+
+      socket.emit("requestRoundInfo");
+
+      function startHostCam() {
+        const url = `https://vdo.ninja/?push=${hostStreamId}&select&webcam`;
+        const preview = document.getElementById("host-preview");
+        preview.style.display = "block";
+        preview.innerHTML = `<iframe src="${url}" allow="autoplay; camera; microphone"></iframe>`;
+        socket.emit("setHostId", hostStreamId);
+      }
+
+      function startRound() {
+        const inno = document.getElementById("qInno").value;
+        const out = document.getElementById("qOut").value;
+        const count = document.getElementById("imposterCount").value;
+        if (!inno || !out) return alert("Fragen eingeben!");
+        socket.emit("startRound", { inno, out, count });
+        // Inbox leeren bei neuer Runde?
+        // document.getElementById('inbox-list').innerHTML = "";
+      }
+
+      // --- MESSAGING LOGIK ---
+      socket.on("incomingQuestion", (data) => {
+        const list = document.getElementById("inbox-list");
+        // "Keine Nachrichten" entfernen
+        if (list.innerText.includes("Keine neuen")) list.innerHTML = "";
+
+        // Zufällige ID für Input Feld
+        const msgId = "msg-" + Math.random().toString(36).substr(2, 5);
+
+        const html = `
+            <div class="msg-item">
+                <div class="msg-header">Von: <strong>${data.name}</strong></div>
+                <div class="msg-text">${data.text}</div>
+                <div class="reply-area">
+                    <input type="text" id="${msgId}" placeholder="Antwort..." style="margin:0;">
+                    <button class="btn-blue" onclick="replyTo('${data.id}', '${msgId}')">Send</button>
+                </div>
+            </div>
+        `;
+        list.innerHTML = html + list.innerHTML; // Neueste oben
+      });
+
+      function replyTo(playerId, inputId) {
+        const input = document.getElementById(inputId);
+        const text = input.value;
+        if (text) {
+          socket.emit("adminAnswer", { playerId: playerId, text: text });
+          input.value = "Gesendet!";
+          input.disabled = true;
+          input.style.background = "#2e7d32";
+        }
+      }
+
+      // --- STANDARD LOGIK ---
+      window.reveal = function (id) {
+        socket.emit("revealOne", id);
+      };
+      window.addPoints = function (id, pts) {
+        socket.emit("givePoints", { id: id, amount: pts });
+      };
+
+      socket.on("roundInfoUpdate", (data) => {
+        document.getElementById("infoInno").innerText = data.questionInno;
+        document.getElementById("infoOut").innerText = data.questionOut;
+        currentOutsiderIds = data.outsiderIds || [];
+        socket.emit("requestPlayerListUpdate");
+      });
+
+      socket.on("updatePlayerList", (players) => {
+        const list = document.getElementById("playerList");
+        list.innerHTML = "";
+        Object.values(players).forEach((p) => {
+          const isOutsider = currentOutsiderIds.includes(p.id);
+          const hasImage = p.image ? true : false;
+          const previewHTML = hasImage
+            ? `<img src="${p.image}" class="preview-thumb" onclick="reveal('${p.id}')" style="cursor:pointer;">`
+            : `<div class="preview-thumb" style="background:#222; display:flex; align-items:center; justify-content:center; color:#555;">⏳</div>`;
+
+          let rowClass = "player-row";
+          if (isOutsider) rowClass += " outsider-row";
+
+          const outsiderIcon = isOutsider ? "😈" : "😇";
+
+          list.innerHTML += `
+          <div class="${rowClass}">
+            <div style="display:flex; align-items:center;">
+               ${previewHTML}
+               <div>
+                   <div style="font-weight:bold; font-size:1rem;">${outsiderIcon} ${p.name}</div>
+                   <div style="font-size:0.8rem; color:#aaa;">${p.score} Pkt</div>
+               </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+               <div style="display:flex; gap:2px;">
+                   <button class="btn-green" onclick="reveal('${p.id}')" style="width:100%;">ZEIGEN</button>
+               </div>
+               <div style="display:flex; gap:2px;">
+                   <button class="btn-dark" onclick="addPoints('${p.id}', -2)">-2</button>
+                   <button class="btn-dark" onclick="addPoints('${p.id}', 2)">+2</button>
+                   <button class="btn-dark" onclick="addPoints('${p.id}', 4)">+4</button>
+               </div>
+            </div>
+          </div>
+        `;
+        });
+      });
+    </script>
+  </body>
+</html>

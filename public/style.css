@@ -1,0 +1,301 @@
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap');
+
+body {
+  margin: 0;
+  font-family: 'Rubik', sans-serif;
+  background: linear-gradient(135deg, #050505 0%, #130821 100%);
+  color: white;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* --- GRID LAYOUT --- */
+#main-grid {
+  display: grid;
+  /* Wir geben den Spielern unten mehr Platz (60%) */
+  grid-template-rows: 25vh 15vh 1fr; 
+  padding: 2vh 4vh;
+  box-sizing: border-box;
+  height: 100vh;
+  width: 100%;
+  gap: 1vh;
+}
+
+/* --- REIHE 1: HOST & HEADER --- */
+.top-section {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.logo-area {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%; 
+  max-height: 120px;
+  filter: drop-shadow(0 0 10px rgba(138, 43, 226, 0.5));
+  z-index: 10;
+}
+.logo-area img { height: 100%; width: auto; object-fit: contain;}
+
+.socials-area {
+  position: absolute;
+  top: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-end;
+  z-index: 10;
+}
+
+.social-pill {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-left: 3px solid #8a2be2;
+  color: #eee;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.social-pill strong { color: white; }
+
+/* Host Cam */
+.host-cam-wrapper {
+  height: 100%;
+  aspect-ratio: 16/9; 
+  border: 3px solid #8a2be2;
+  border-radius: 12px;
+  overflow: hidden;
+  background: black;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+  z-index: 5;
+  position: relative;
+}
+
+.host-name-tag {
+  position: absolute;
+  bottom: -15px; /* Etwas tiefer hängen */
+  left: 50%;
+  transform: translateX(-50%);
+  background: #8a2be2;
+  color: white;
+  padding: 2px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+  text-transform: uppercase;
+  z-index: 20;
+}
+
+/* --- REIHE 2: FRAGE --- */
+.question-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  overflow: visible; /* Damit Schatten nicht abgeschnitten werden */
+}
+
+.main-question {
+  background: rgba(10, 10, 15, 0.95);
+  border: 1px solid rgba(138, 43, 226, 0.3);
+  padding: 10px 30px;
+  font-size: 2.2rem; 
+  font-weight: 700;
+  text-align: center;
+  width: 80%;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+  opacity: 0;
+  transition: opacity 0.5s, transform 0.5s;
+  text-transform: uppercase;
+  transform: translateY(20px);
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.main-question.visible { opacity: 1; transform: translateY(0); }
+
+/* --- REIHE 3: SPIELER --- */
+.players-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  align-items: center; 
+  height: 100%;
+}
+
+.player-slot {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* Inhalt nach unten drücken */
+  background: rgba(20, 20, 20, 0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.05);
+  overflow: hidden;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+  height: 100%; /* Füllt die Zelle aus */
+  max-height: 100%;
+  position: relative;
+}
+
+.cam-wrapper { 
+  width: 100%; 
+  aspect-ratio: 16/9; 
+  background: #000; 
+  flex-shrink: 1; /* Darf kleiner werden wenn nötig */
+  min-height: 0;
+}
+iframe { width: 100%; height: 100%; border: none; }
+
+.answer-board {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-top: 3px solid #8a2be2;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 1; /* Darf kleiner werden */
+  min-height: 0;
+}
+
+.answer-cover {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: #151515;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 3rem;
+  color: #444;
+  transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  transform-origin: top;
+  z-index: 2;
+  background-image: radial-gradient(#333 1px, transparent 1px);
+  background-size: 15px 15px;
+}
+.answer-cover.open { transform: scaleY(0); }
+.answer-board img { width: 100%; height: 100%; object-fit: contain; z-index: 1; }
+
+/* DER FIX: Info darf nicht schrumpfen */
+.player-info {
+  background: #0a0a0a;
+  padding: 8px 15px;
+  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #333;
+  color: white;
+
+  /* Wichtig: */
+  flex-shrink: 0; 
+  min-height: 40px;
+  z-index: 10;
+}
+
+.player-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70%;
+}
+
+.score-badge { 
+    color: #ffd700; 
+    font-family: 'VT323', monospace; 
+    font-size: 1.8rem;
+    line-height: 1;
+}
+
+/* --- TIMER STYLE --- */
+#timer-overlay {
+    position: absolute;
+    top: 20%; /* Etwas unterhalb der Header-Zeile */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(220, 0, 0, 0.9); /* Warn-Rot */
+    color: white;
+    padding: 10px 40px;
+    font-size: 4rem;
+    font-family: 'Rubik', sans-serif;
+    font-weight: 700;
+    border-radius: 15px;
+    box-shadow: 0 0 50px rgba(255, 0, 0, 0.6);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none; /* Klickbar drunter */
+    transition: opacity 0.5s ease-in-out, transform 0.5s ease;
+    border: 2px solid white;
+}
+
+#timer-overlay.active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+    animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+    from { box-shadow: 0 0 20px rgba(255, 0, 0, 0.4); }
+    to { box-shadow: 0 0 60px rgba(255, 0, 0, 0.9); }
+}
+
+/* Update für Buttons im Admin Panel damit die neuen Minus-Knöpfe passen */
+.btn-dark { padding: 5px 8px; font-size: 0.8rem; }
+
+/* ... (Dein restlicher CSS Code bleibt oben gleich) ... */
+
+/* ... (Dein restlicher CSS Code bleibt) ... */
+
+/* --- IMPOSTER REVEAL (Die "Hammer"-Methode) --- */
+
+/* 2. Der Rahmen selbst */
+.imposter-frame {
+    position: absolute; /* Legt sich über den Slot */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999; /* Ganz oben */
+    pointer-events: none; /* Klicks gehen durch */
+
+    /* Der rote Look */
+    border: 8px solid #ff0000;
+    border-radius: 12px; /* Muss exakt zum Slot-Radius passen */
+    box-sizing: border-box; /* Wichtig, damit der Rand INNEN ist */
+
+    opacity: 0; /* Unsichtbar starten */
+    transition: opacity 0.3s ease;
+}
+
+/* Wenn der Slot "is-imposter" ist, wird der Rahmen sichtbar und pulsiert */
+.player-slot.is-imposter .imposter-frame {
+    opacity: 1;
+    animation: danger-pulse 1s infinite alternate;
+}
+
+/* Roter Hintergrund für den Namen */
+.player-slot.is-imposter .player-info {
+    background-color: #500000 !important;
+    color: #ffcccc !important;
+    position: relative;
+    z-index: 10000;
+}
+
+@keyframes danger-pulse {
+    from { box-shadow: inset 0 0 20px rgba(255, 0, 0, 0.3); border-color: #aa0000; }
+    to { box-shadow: inset 0 0 60px rgba(255, 0, 0, 0.8); border-color: #ff0000; }
+}

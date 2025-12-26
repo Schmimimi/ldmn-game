@@ -1,0 +1,615 @@
+<!doctype html>
+<html>
+  <head>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Player Panel</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* --- BASIS STYLES --- */
+      body {
+        background: linear-gradient(135deg, #050505 0%, #130821 100%);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 0;
+        margin: 0;
+        font-family: "Rubik", sans-serif;
+        color: white;
+      }
+
+      /* LOGIN */
+      #login {
+        padding: 40px;
+        text-align: center;
+        margin-top: 15vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .login-card {
+        background: rgba(20, 20, 20, 0.8);
+        padding: 30px;
+        border-radius: 15px;
+        border: 1px solid #8a2be2;
+        width: 100%;
+        max-width: 350px;
+      }
+      input {
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #444;
+        background: #1a1a1a;
+        color: white;
+        margin: 15px 0;
+        font-size: 1.1rem;
+        width: 100%;
+        box-sizing: border-box;
+        text-align: center;
+      }
+      button {
+        padding: 15px;
+        border-radius: 8px;
+        font-weight: 700;
+        color: white;
+        border: none;
+        font-size: 1rem;
+        cursor: pointer;
+        text-transform: uppercase;
+        font-family: "Rubik", sans-serif;
+      }
+
+      /* LAYOUT */
+      #game {
+        display: none;
+        height: 100%;
+        flex-direction: column;
+        width: 100%;
+      }
+
+      #my-cam-preview {
+        width: 100%;
+        flex-shrink: 0;
+        aspect-ratio: 16/9;
+        background: #000;
+        border-bottom: 2px solid #8a2be2;
+        max-height: 25vh;
+      }
+      iframe.pusher {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+
+      #workspace {
+        flex: 1;
+        background: #111;
+        padding: 10px;
+        display: flex;
+        gap: 15px;
+        overflow-y: auto;
+        align-items: flex-start;
+        justify-content: center;
+      }
+      .paint-section {
+        flex: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: 800px;
+      }
+
+      .chat-section {
+        flex: 1;
+        min-width: 250px;
+        max-width: 400px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        max-height: 400px;
+      }
+
+      @media (max-width: 900px) {
+        #workspace {
+          flex-direction: column;
+          align-items: center;
+        }
+        .paint-section {
+          flex: none;
+          width: 100%;
+        }
+        .chat-section {
+          width: 100%;
+          flex: none;
+          height: 150px;
+          min-height: 150px;
+          margin-bottom: 10px;
+        }
+      }
+
+      #task {
+        color: #00ff88;
+        font-size: 1.2rem;
+        margin: 5px 0 10px 0;
+        min-height: 25px;
+        font-weight: 700;
+        text-align: center;
+      }
+      canvas {
+        background: white;
+        border-radius: 8px;
+        cursor: crosshair;
+        touch-action: none;
+        width: 100%;
+        aspect-ratio: 16/9;
+        height: auto;
+        border: 2px solid #333;
+      }
+      .btn-row {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+        margin-top: 10px;
+        height: 50px;
+      }
+      .btn-send {
+        background: #00ff88;
+        color: black;
+        flex: 2;
+      }
+      .btn-clear {
+        background: #333;
+        color: #ccc;
+        flex: 1;
+      }
+
+      /* CHAT */
+      #host-messages {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .chat-header {
+        font-size: 0.9rem;
+        color: #888;
+        text-transform: uppercase;
+        border-bottom: 1px solid #444;
+        margin-bottom: 5px;
+        padding-bottom: 5px;
+      }
+      .admin-reply {
+        background: #1a237e;
+        border-left: 3px solid #536dfe;
+        padding: 10px;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        animation: slideIn 0.3s ease;
+      }
+
+      /* FOOTER BAR */
+      .footer-bar {
+        flex-shrink: 0;
+        display: flex;
+        gap: 10px;
+        padding: 10px;
+        background: #0a0a0a;
+        border-top: 1px solid #333;
+        z-index: 10;
+      }
+      .btn-info {
+        background: #444;
+        flex: 1;
+        font-size: 0.9rem;
+      }
+      .btn-help {
+        background: #2196f3;
+        flex: 1;
+        font-size: 0.9rem;
+      }
+      .btn-score {
+        background: #ffd700;
+        color: black;
+        flex: 1;
+        font-size: 0.9rem;
+      } /* GOLDENER BUTTON */
+
+      /* MODALS */
+      .modal {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+        backdrop-filter: blur(5px);
+      }
+      .modal-content {
+        background: #1a1a1a;
+        border: 1px solid #8a2be2;
+        padding: 20px;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 500px;
+        max-height: 80vh;
+        overflow-y: auto;
+        text-align: left;
+      }
+      .rule-item {
+        margin-bottom: 12px;
+        font-size: 0.95rem;
+        color: #ddd;
+        display: flex;
+        gap: 10px;
+      }
+
+      /* LEADERBOARD STYLES */
+      .lb-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px;
+        border-bottom: 1px solid #333;
+        align-items: center;
+      }
+      .lb-row:last-child {
+        border-bottom: none;
+      }
+      .lb-rank {
+        font-weight: bold;
+        width: 30px;
+        color: #888;
+      }
+      .lb-name {
+        flex: 1;
+        font-weight: 500;
+      }
+      .lb-score {
+        font-weight: bold;
+        color: #ffd700;
+        font-family: monospace;
+        font-size: 1.2rem;
+      }
+
+      /* Wenn man es selbst ist */
+      .lb-row.is-me {
+        background: rgba(138, 43, 226, 0.2);
+        border-left: 3px solid #8a2be2;
+      }
+      /* Der Erste Platz */
+      .lb-row.rank-1 .lb-rank {
+        color: #ffd700;
+      }
+      .lb-row.rank-1 .lb-name::after {
+        content: " 👑";
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateY(10px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <div id="login">
+      <div class="login-card">
+        <h2 style="margin-top: 0">SPIELER LOGIN</h2>
+        <input id="username" type="text" placeholder="..." />
+        <button onclick="joinGame()" style="background: #8a2be2; width: 100%">
+          WEITER ZUR KAMERA
+        </button>
+      </div>
+    </div>
+
+    <div id="game">
+      <div id="my-cam-preview"></div>
+
+      <div id="workspace">
+        <div class="paint-section">
+          <div id="task">Warte auf Start...</div>
+          <canvas id="canvas" width="1280" height="720"></canvas>
+          <div class="btn-row">
+            <button onclick="clearCanvas()" class="btn-clear">LÖSCHEN</button>
+            <button onclick="submit()" class="btn-send">SENDEN</button>
+          </div>
+        </div>
+
+        <div class="chat-section">
+          <div class="chat-header">Nachrichten vom Host</div>
+          <div id="host-messages">
+            <div style="color: #666; font-style: italic; font-size: 0.9rem">
+              Keine Nachrichten.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bar">
+        <button class="btn-info" onclick="toggleModal('rules-modal')">
+          ⚠️ REGELN
+        </button>
+        <button class="btn-help" onclick="toggleModal('help-modal')">
+          ❓ FRAGE
+        </button>
+        <button class="btn-score" onclick="toggleModal('score-modal')">
+          🏆 PUNKTE
+        </button>
+      </div>
+    </div>
+
+    <div id="rules-modal" class="modal">
+      <div class="modal-content">
+        <h3 style="color: #8a2be2; text-align: center; margin-top: 0">
+          REGELN
+        </h3>
+        <div class="rule-item">
+          <span>➤</span> Lest euch alle Fragen gründlich durch!
+        </div>
+        <div class="rule-item">
+          <span>➤</span> Pokerface: Keine Geräusche, kein Lachen!
+        </div>
+        <div class="rule-item">
+          <span>➤</span> Content: Argumentiert, auch wenn ihr lügt!
+        </div>
+        <div class="rule-item">
+          <span>➤</span> Keine Links & Player-Panel nicht zeigen!
+        </div>
+        <br />
+        <button
+          onclick="toggleModal('rules-modal')"
+          style="background: #444; width: 100%"
+        >
+          VERSTANDEN
+        </button>
+      </div>
+    </div>
+
+    <div id="help-modal" class="modal">
+      <div class="modal-content">
+        <h3 style="color: #2196f3; text-align: center; margin-top: 0">
+          FRAGE AN DEN HOST
+        </h3>
+        <input
+          type="text"
+          id="q-input"
+          placeholder="Deine Frage..."
+          style="text-align: left"
+        />
+        <button
+          onclick="sendQuestion()"
+          style="background: #2196f3; width: 100%"
+        >
+          ABSENDEN
+        </button>
+        <br /><br />
+        <button
+          onclick="toggleModal('help-modal')"
+          style="background: #444; width: 100%"
+        >
+          SCHLIESSEN
+        </button>
+      </div>
+    </div>
+
+    <div id="score-modal" class="modal">
+      <div class="modal-content">
+        <h3 style="color: #ffd700; text-align: center; margin-top: 0">
+          RANGLISTE
+        </h3>
+        <div id="leaderboard-list"></div>
+        <br />
+        <button
+          onclick="toggleModal('score-modal')"
+          style="background: #444; width: 100%"
+        >
+          SCHLIESSEN
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const socket = io({
+        reconnection: true, // Versuche unbedingt neu zu verbinden
+        reconnectionAttempts: Infinity, // Gib niemals auf
+        reconnectionDelay: 1000, // Warte 1 Sekunde zwischen Versuchen
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+      });
+
+      // --- DER LEBENSRETTER CODE ---
+
+      // 1. Wachmacher: Alle 15 Sekunden hallo sagen
+      setInterval(() => {
+        if (socket.connected) {
+          socket.emit("ping"); // Sendet Daten, damit Replit nicht einschläft
+        }
+      }, 15000);
+
+      // 2. Auto-Rejoin: Wenn Verbindung wieder da ist -> Sofort wieder anmelden!
+      socket.on("connect", () => {
+        console.log("Verbunden!");
+        const name = document.getElementById("username").value;
+
+        // Sind wir schon im Game-Modus? (Display ist flex)
+        if (document.getElementById("game").style.display === "flex" && name) {
+          console.log(
+            "Verbindung war weg - Melde mich automatisch wieder an...",
+          );
+          // Wir senden einfach nochmal den Join-Befehl
+          // streamId ist global gespeichert, also nutzen wir die gleiche
+          socket.emit("join", { name: name, streamId: myStreamId });
+        }
+      });
+
+      socket.on("disconnect", (reason) => {
+        console.log("Verbindung verloren:", reason);
+        // Optional: Kleiner roter Punkt oben rechts anzeigen, wenn offline
+      });
+
+      // ... (Dein restlicher Code) ...
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      let drawing = false;
+
+      window.onload = function () {
+        const urlParams = new URLSearchParams(window.location.search);
+        const twitchName = urlParams.get("username");
+        if (twitchName) {
+          document.getElementById("username").value = twitchName;
+          document.getElementById("username").disabled = true;
+        }
+      };
+
+      const myStreamId = "game_" + Math.random().toString(36).substr(2, 9);
+
+      function joinGame() {
+        const name = document.getElementById("username").value;
+        if (name) {
+          document.getElementById("login").style.display = "none";
+          document.getElementById("game").style.display = "flex";
+          const vdoUrl = `https://vdo.ninja/?push=${myStreamId}&select&webcam`;
+          document.getElementById("my-cam-preview").innerHTML =
+            `<iframe class="pusher" src="${vdoUrl}" allow="autoplay; camera; microphone"></iframe>`;
+          socket.emit("join", { name: name, streamId: myStreamId });
+        } else {
+          alert("Bitte Namen eingeben!");
+        }
+      }
+
+      function toggleModal(id) {
+        const el = document.getElementById(id);
+        el.style.display = el.style.display === "flex" ? "none" : "flex";
+      }
+
+      // --- LEADERBOARD LOGIK ---
+      socket.on("updatePlayerList", (players) => {
+        renderLeaderboard(players);
+      });
+
+      function renderLeaderboard(players) {
+        const list = document.getElementById("leaderboard-list");
+        list.innerHTML = "";
+
+        // 1. In Array umwandeln und sortieren (Höchste Punkte zuerst)
+        const sorted = Object.values(players).sort((a, b) => b.score - a.score);
+
+        // 2. HTML bauen
+        sorted.forEach((p, index) => {
+          const rank = index + 1;
+          const isMe = p.id === socket.id;
+
+          let cssClass = "lb-row";
+          if (rank === 1) cssClass += " rank-1";
+          if (isMe) cssClass += " is-me";
+
+          list.innerHTML += `
+                <div class="${cssClass}">
+                    <div class="lb-rank">#${rank}</div>
+                    <div class="lb-name">${p.name} ${isMe ? "(Du)" : ""}</div>
+                    <div class="lb-score">${p.score}</div>
+                </div>
+            `;
+        });
+      }
+
+      // --- CHAT LOGIC ---
+      function sendQuestion() {
+        const txt = document.getElementById("q-input").value;
+        if (txt) {
+          socket.emit("playerQuestion", txt);
+          document.getElementById("q-input").value = "";
+          toggleModal("help-modal");
+          alert("Frage gesendet!");
+        }
+      }
+      socket.on("hostReply", (text) => {
+        const container = document.getElementById("host-messages");
+        if (container.innerHTML.includes("Keine Nachrichten"))
+          container.innerHTML = "";
+        container.innerHTML =
+          `<div class="admin-reply"><div style="font-weight:bold; color:#00ff88; margin-bottom:5px;">HOST ANTWORTET:</div><div>${text}</div></div>` +
+          container.innerHTML;
+      });
+
+      // --- MALEN ---
+      function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const clientX = e.clientX || e.touches[0].clientX;
+        const clientY = e.clientY || e.touches[0].clientY;
+        return {
+          x: (clientX - rect.left) * scaleX,
+          y: (clientY - rect.top) * scaleY,
+        };
+      }
+      function startPos(e) {
+        drawing = true;
+        draw(e);
+      }
+      function endPos() {
+        drawing = false;
+        ctx.beginPath();
+      }
+      function draw(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        ctx.lineWidth = 6;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "black";
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+      }
+      ["mousedown", "touchstart"].forEach((evt) =>
+        canvas.addEventListener(evt, startPos),
+      );
+      ["mouseup", "touchend"].forEach((evt) =>
+        canvas.addEventListener(evt, endPos),
+      );
+      ["mousemove", "touchmove"].forEach((evt) =>
+        canvas.addEventListener(evt, draw),
+      );
+
+      socket.on("newTask", (txt) => {
+        document.getElementById("task").innerText = txt;
+        clearCanvas();
+      });
+      function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      function submit() {
+        const data = canvas.toDataURL();
+        socket.emit("submitDrawing", data);
+        document.getElementById("task").innerText = "Gesendet!";
+      }
+    </script>
+  </body>
+</html>

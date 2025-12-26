@@ -1,0 +1,230 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>LDMN Overlay</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <div id="main-grid">
+      <div id="timer-overlay">02:00</div>
+
+      <div class="top-section">
+        <div class="logo-area">
+          <img src="ldmns.png" alt="Logo" />
+        </div>
+
+        <div class="host-cam-wrapper" id="hostContainer"></div>
+        <div class="host-name-tag">SCHMILLEY</div>
+
+        <div class="socials-area">
+          <div class="social-pill"><strong>Twitch</strong> @schmilley</div>
+          <div class="social-pill"><strong>YouTube</strong> @schmilley</div>
+          <div class="social-pill"><strong>TikTok</strong> @schmilley_</div>
+          <div class="social-pill"><strong>X</strong> @schmilleytv</div>
+        </div>
+      </div>
+
+      <div class="question-section">
+        <div class="main-question" id="questionDisplay">
+          LÜGEN DARF MAN NICHT
+        </div>
+      </div>
+
+      <div class="players-row" id="playersContainer"></div>
+    </div>
+
+    <script>
+      const socket = io({
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+      });
+
+      // Wenn Overlay neu verbindet, sofort aktuellen Stand holen
+      socket.on("connect", () => {
+        console.log("Overlay Reconnected");
+        // Wir fragen den Server: "Gib mir alles was du hast"
+        socket.emit("requestPlayerListUpdate");
+        socket.emit("revealQuestion"); // Holt Frage, falls gerade eine offen ist (Workaround)
+      });
+      const pContainer = document.getElementById("playersContainer");
+      const timerEl = document.getElementById("timer-overlay");
+      let timerInterval = null;
+
+      // --- 1. INITIALISIERUNG ---
+      for (let i = 0; i < 4; i++) {
+        pContainer.innerHTML += `
+          <div class="player-slot" id="slot-${i}" data-pid="">
+
+             <div class="imposter-frame"></div>
+
+             <div class="cam-wrapper" id="cam-${i}"></div>
+
+             <div class="answer-board">
+               <div class="answer-cover" id="cover-${i}">?</div>
+               <div id="img-container-${i}" style="width:100%;height:100%;display:flex;justify-content:center;align-items:center;"></div>
+             </div>
+
+             <div class="player-info">
+               <span class="player-name" id="name-${i}">Warten...</span>
+               <span class="score-badge" id="score-${i}">0</span>
+             </div>
+          </div>
+        `;
+      }
+
+      // --- 2. TIMER FUNKTIONEN ---
+      function startCountdown(durationSeconds) {
+        clearInterval(timerInterval);
+        let timer = durationSeconds;
+
+        timerEl.classList.add("active"); // CSS Klasse zum Einblenden
+
+        function updateDisplay() {
+          let minutes = parseInt(timer / 60, 10);
+          let seconds = parseInt(timer % 60, 10);
+          minutes = minutes < 10 ? "0" + minutes : minutes;
+          seconds = seconds < 10 ? "0" + seconds : seconds;
+          timerEl.textContent = minutes + ":" + seconds;
+        }
+
+        updateDisplay();
+
+        timerInterval = setInterval(function () {
+          if (--timer < 0) {
+            timer = 0;
+            clearInterval(timerInterval);
+            timerEl.textContent = "00:00";
+          } else {
+            updateDisplay();
+          }
+        }, 1000);
+      }
+
+      function stopCountdown() {
+        clearInterval(timerInterval);
+        timerEl.classList.remove("active");
+      }
+
+      socket.on("timerStart", () => {
+        startCountdown(120); // 120 Sekunden = 2 Minuten
+      });
+
+      socket.on("timerStop", () => {
+        stopCountdown();
+      });
+
+      // --- 3. VDO.NINJA EINBINDUNG ---
+      function embedVDO(containerId, streamId) {
+        const container = document.getElementById(containerId);
+
+        // Sicherheitscheck: Ist die ID gültig?
+        if (!streamId || streamId.length < 3) {
+          container.innerHTML = "";
+          return;
+        }
+
+        // Link bauen: View Mode, Clean (kein UI), Transparent, Autoplay
+        const url = `https://vdo.ninja/?view=${streamId}&clean&transparent&autoplay&scene&noheader`;
+
+        // Checken ob Iframe schon existiert (um Flackern zu verhindern)
+        const existingIframe = container.querySelector("iframe");
+        if (existingIframe && existingIframe.src === url) return;
+
+        console.log(`Lade Stream für ${containerId}: ${streamId}`);
+        container.innerHTML = `<iframe src="${url}" allow="autoplay; camera; microphone; fullscreen" style="width:100%; height:100%; border:none;"></iframe>`;
+      }
+
+      // Host Update
+      socket.on("updateHost", (id) => {
+        embedVDO("hostContainer", id);
+      });
+
+      // Spieler Update
+      socket.on("updatePlayerList", (players) => {
+        const pList = Object.values(players);
+
+        for (let i = 0; i < 4; i++) {
+          const player = pList[i];
+          const slot = document.getElementById(`slot-${i}`);
+
+          if (player) {
+            // Daten füllen
+            document.getElementById(`name-${i}`).innerText = player.name;
+            document.getElementById(`score-${i}`).innerText = player.score;
+            slot.dataset.pid = player.id; // WICHTIG für Reveal Logic
+
+            // Kamera laden
+            embedVDO(`cam-${i}`, player.streamId);
+          } else {
+            // Leeren Slot resetten
+            document.getElementById(`name-${i}`).innerText = "Leer";
+            document.getElementById(`score-${i}`).innerText = "0";
+            document.getElementById(`cam-${i}`).innerHTML = "";
+            slot.dataset.pid = "";
+            slot.classList.remove("is-imposter"); // Rahmen entfernen falls gesetzt
+          }
+        }
+      });
+
+      // --- 4. GAME LOGIK (Reveals) ---
+
+      // Einzelnes Bild aufdecken
+      socket.on("showOneAnswer", (data) => {
+        const slots = document.querySelectorAll(".player-slot");
+        slots.forEach((slot, index) => {
+          if (slot.dataset.pid === data.id) {
+            document.getElementById(`img-container-${index}`).innerHTML =
+              `<img src="${data.image}">`;
+            document.getElementById(`cover-${index}`).classList.add("open");
+          }
+        });
+      });
+
+      // Frage einblenden
+      socket.on("showQuestion", (txt) => {
+        const q = document.getElementById("questionDisplay");
+        q.innerText = txt;
+        q.classList.add("visible");
+      });
+
+      // IMPOSTER AUFLÖSEN (Roter Rahmen)
+      socket.on("showRoles", (imposterIds) => {
+        console.log("Zeige Imposter:", imposterIds);
+
+        const slots = document.querySelectorAll(".player-slot");
+        slots.forEach((slot) => {
+          const pid = slot.dataset.pid;
+          // Prüfen ob die ID dieses Slots in der Liste der Imposter ist
+          if (pid && imposterIds.includes(pid)) {
+            slot.classList.add("is-imposter"); // Triggered CSS Animation
+          }
+        });
+      });
+
+      // RESET (Alles auf Null)
+      socket.on("resetOverlay", () => {
+        // Cover zu
+        document
+          .querySelectorAll(".answer-cover")
+          .forEach((c) => c.classList.remove("open"));
+        // Bilder weg
+        document
+          .querySelectorAll('[id^="img-container-"]')
+          .forEach((d) => (d.innerHTML = ""));
+        // Imposter Rahmen weg
+        document
+          .querySelectorAll(".player-slot")
+          .forEach((s) => s.classList.remove("is-imposter"));
+
+        // Frage ausblenden
+        const q = document.getElementById("questionDisplay");
+        q.classList.remove("visible");
+
+        // Timer stoppen
+        stopCountdown();
+      });
+    </script>
+  </body>
+</html>
