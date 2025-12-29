@@ -21,7 +21,7 @@ let players = {};
 let whitelist = []; // Hier werden erlaubte Spielernamen gespeichert
 let currentQuestionInno = "";
 let currentQuestionOut = "";
-let currentOutsiderId = null;
+let imposterIds = []; // Geändert zu einer Liste (Array)
 
 // --- AUTH SETUP ---
 app.use(
@@ -160,31 +160,66 @@ io.on("connection", (socket) => {
 
   socket.on("setHostId", (id) => io.emit("updateHost", id));
 
+// 1. RUNDE STARTEN (Jetzt mit Anzahl!)
   socket.on("startRound", (data) => {
     currentQuestionInno = data.inno;
     currentQuestionOut = data.out;
-    const pIds = Object.keys(players);
-    if (pIds.length > 0)
-      currentOutsiderId = pIds[Math.floor(Math.random() * pIds.length)];
+    
+    // Anzahl auslesen (Standard 1)
+    const count = parseInt(data.count) || 1;
 
+    const pIds = Object.keys(players);
+    
+    // RESET
+    imposterIds = []; // Liste leeren
     pIds.forEach((id) => (players[id].image = null));
+
+    // ZUFALLSWAHL (Mehrere Imposter möglich)
+    if (pIds.length > 0) {
+        // Spieler mischen und die ersten 'count' auswählen
+        const shuffled = pIds.sort(() => 0.5 - Math.random());
+        imposterIds = shuffled.slice(0, count);
+    }
+
     io.emit("resetOverlay");
     io.emit("updatePlayerList", players);
 
+    // AUFGABEN VERTEILEN
     pIds.forEach((id) => {
+      // Prüfen ob die ID in der Imposter-Liste ist
+      const isImposter = imposterIds.includes(id);
       io.to(id).emit(
         "newTask",
-        id === currentOutsiderId ? currentQuestionOut : currentQuestionInno,
+        isImposter ? currentQuestionOut : currentQuestionInno,
       );
     });
 
-    socket.emit("roundInfoUpdate", {
+    // INFO AN ADMIN SENDEN (Als Liste!)
+    io.emit("roundInfoUpdate", {
       questionInno: currentQuestionInno,
       questionOut: currentQuestionOut,
-      outsiderId: currentOutsiderId,
+      imposterIds: imposterIds, 
     });
   });
 
+  // 2. IMPOSTER AUFLÖSEN (Fehlte vorher!)
+  socket.on("revealRoles", () => {
+      io.emit("showRoles", imposterIds);
+  });
+
+  // 3. FRAGEN-SYSTEM (Fehlte vorher!)
+  socket.on("playerQuestion", (text) => {
+      const pName = players[socket.id] ? players[socket.id].name : "Unbekannt";
+      // An Admin senden
+      io.emit("incomingQuestion", { id: socket.id, name: pName, text: text });
+  });
+
+  socket.on("adminAnswer", (data) => {
+      // Antwort an den spezifischen Spieler zurück
+      io.to(data.playerId).emit("hostReply", data.text);
+  });
+
+  // ... (Hier gehts weiter mit submitDrawing wie vorher) ...
   socket.on("submitDrawing", (data) => {
     if (players[socket.id]) {
       players[socket.id].image = data;
