@@ -422,7 +422,8 @@
       socket.on("roundInfoUpdate", (data) => {
         document.getElementById("infoInno").innerText = data.questionInno;
         document.getElementById("infoOut").innerText = data.questionOut;
-        currentOutsiderIds = data.outsiderIds || [];
+// Wir lesen jetzt imposterIds (so wie es der Server sendet)
+        currentOutsiderIds = data.imposterIds || [];
         socket.emit("requestPlayerListUpdate");
       });
 
