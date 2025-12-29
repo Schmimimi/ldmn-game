@@ -277,6 +277,27 @@
           <div id="playerList"></div>
         </div>
       </div>
+      <div
+        style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px"
+      >
+        <h3>🛡️ Whitelist (Zugriffskontrolle)</h3>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px">
+          <input
+            type="text"
+            id="whitelistInput"
+            placeholder="Twitch Name (z.B. handofblood)"
+            style="padding: 10px"
+          />
+          <button onclick="addToWhitelist()" style="background: #2ecc71">
+            Hinzufügen
+          </button>
+        </div>
+
+        <div
+          id="whitelistDisplay"
+          style="display: flex; flex-wrap: wrap; gap: 10px"
+        ></div>
+      </div>
     </div>
 
     <script>
@@ -355,6 +376,40 @@
           input.style.background = "#2e7d32";
         }
       }
+
+      // --- WHITELIST LOGIK ---
+      const wInput = document.getElementById("whitelistInput");
+      const wDisplay = document.getElementById("whitelistDisplay");
+
+      function addToWhitelist() {
+        const name = wInput.value.trim();
+        if (name) {
+          socket.emit("admin_addWhitelist", name);
+          wInput.value = "";
+        }
+      }
+
+      function removeFromWhitelist(name) {
+        if (confirm(name + " wirklich entfernen?")) {
+          socket.emit("admin_removeWhitelist", name);
+        }
+      }
+
+      // Update vom Server empfangen
+      socket.on("updateWhitelist", (list) => {
+        wDisplay.innerHTML = "";
+        list.forEach((name) => {
+          wDisplay.innerHTML += `
+                  <div style="background: #444; padding: 5px 10px; border-radius: 5px; display: flex; align-items: center; gap: 10px;">
+                      ${name} 
+                      <span onclick="removeFromWhitelist('${name}')" style="cursor: pointer; color: #ff5555; font-weight: bold;">✕</span>
+                  </div>
+              `;
+        });
+      });
+
+      // Beim Laden Liste anfordern
+      socket.emit("admin_requestWhitelist");
 
       // --- STANDARD LOGIK ---
       window.reveal = function (id) {

@@ -66,11 +66,12 @@
                <div id="img-container-${i}" style="width:100%;height:100%;display:flex;justify-content:center;align-items:center;"></div>
              </div>
 
-             <div class="player-info">
+              <div class="player-info">
+               <img class="player-avatar" id="avatar-${i}" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=">
+               
                <span class="player-name" id="name-${i}">Warten...</span>
                <span class="score-badge" id="score-${i}">0</span>
              </div>
-          </div>
         `;
       }
 
@@ -148,12 +149,25 @@
         for (let i = 0; i < 4; i++) {
           const player = pList[i];
           const slot = document.getElementById(`slot-${i}`);
+          // Referenz auf das Bild holen
+          const avatarEl = document.getElementById(`avatar-${i}`);
 
           if (player) {
             // Daten füllen
             document.getElementById(`name-${i}`).innerText = player.name;
             document.getElementById(`score-${i}`).innerText = player.score;
-            slot.dataset.pid = player.id; // WICHTIG für Reveal Logic
+            slot.dataset.pid = player.id;
+
+            // --- NEU: AVATAR LOGIK ---
+            if (player.profileImage) {
+              avatarEl.src = player.profileImage;
+              avatarEl.style.display = "block";
+            } else {
+              // Fallback Bild mit Initialen
+              avatarEl.src = `https://ui-avatars.com/api/?name=${player.name}&background=333&color=fff`;
+              avatarEl.style.display = "block";
+            }
+            // --------------------------
 
             // Kamera laden
             embedVDO(`cam-${i}`, player.streamId);
@@ -162,8 +176,14 @@
             document.getElementById(`name-${i}`).innerText = "Leer";
             document.getElementById(`score-${i}`).innerText = "0";
             document.getElementById(`cam-${i}`).innerHTML = "";
+
+            // --- NEU: AVATAR RESET ---
+            avatarEl.style.display = "none";
+            avatarEl.src = "";
+            // ------------------------
+
             slot.dataset.pid = "";
-            slot.classList.remove("is-imposter"); // Rahmen entfernen falls gesetzt
+            slot.classList.remove("is-imposter");
           }
         }
       });

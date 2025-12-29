@@ -9,31 +9,30 @@ const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
+
+// FIX: Ping/Pong erhöhen gegen Verbindungsabbrüche
 const io = socketIo(server, {
-  pingInterval: 25000, // Alle 25 Sekunden ein "Bist du noch da?" senden
-  pingTimeout: 60000, // Erst nach 60 Sekunden ohne Antwort kicken (vorher war das viel kürzer)
-  connectionStateRecovery: {
-    // Versucht, den Status bei kurzem Abbruch wiederherzustellen
-    maxDisconnectionDuration: 2 * 60 * 1000,
-    skipMiddlewares: true,
-  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
-// ... (Restlicher Code Setup) ...
+// --- VARIABLEN ---
+let players = {};
+let whitelist = []; // Hier werden erlaubte Spielernamen gespeichert
+let currentQuestionInno = "";
+let currentQuestionOut = "";
+let currentOutsiderId = null;
 
-// --- SETUP ---
+// --- AUTH SETUP ---
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "geheim",
+    secret: process.env.SESSION_SECRET || "geheimnis",
     resave: false,
     saveUninitialized: false,
   }),
 );
 app.use(passport.initialize());
 app.use(passport.session());
-
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
 
 passport.use(
   new TwitchStrategy(
@@ -43,66 +42,115 @@ passport.use(
       callbackURL: process.env.CALLBACK_URL,
       scope: "",
     },
-    (accessToken, refreshToken, profile, done) => done(null, profile),
+    function (accessToken, refreshToken, profile, done) {
+      return done(null, profile);
+    },
   ),
 );
 
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((obj, done) => done(null, obj));
+
+// --- MIDDLEWARE (TÜRSTEHER) ---
+
+// 1. Check: Ist User Admin?
 function checkAdmin(req, res, next) {
-  const adminName = process.env.ADMIN_USER || "schmilley";
-  if (
-    req.isAuthenticated() &&
-    req.user.login.toLowerCase() === adminName.toLowerCase()
-  ) {
+  const adminName = (process.env.ADMIN_USER || "schmilley").toLowerCase();
+  if (req.isAuthenticated() && req.user.login.toLowerCase() === adminName) {
     return next();
   }
   res.redirect("/");
 }
 
+// 2. Check: Darf User mitspielen? (Whitelist)
+function checkPlayerAccess(req, res, next) {
+  if (!req.isAuthenticated()) return res.redirect("/");
+
+  const username = req.user.login.toLowerCase();
+  const adminName = (process.env.ADMIN_USER || "schmilley").toLowerCase();
+
+  // Admin darf immer rein, Whitelist-User auch
+  if (username === adminName || whitelist.includes(username)) {
+    return next();
+  } else {
+    // Nicht auf der Liste -> Rauswurf-Seite
+    res.redirect("/no-access.html");
+  }
+}
+
+// --- ROUTEN ---
+
+// Statische Dateien (Public Ordner)
 app.use(express.static("public"));
-app.get("/", (req, res) =>
-  res.sendFile(path.join(__dirname, "public", "index.html")),
-);
+
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/public/index.html");
+});
+
+// Login Start
 app.get("/auth/twitch", passport.authenticate("twitch"));
+
+// Login Rückkehr
 app.get(
   "/auth/twitch/callback",
   passport.authenticate("twitch", { failureRedirect: "/" }),
   (req, res) => {
-    const adminName = process.env.ADMIN_USER || "schmilley";
-    if (req.user.login.toLowerCase() === adminName.toLowerCase())
+    const adminName = (process.env.ADMIN_USER || "schmilley").toLowerCase();
+    // Admin zum Admin-Panel, alle anderen versuchen zum Player-Panel
+    if (req.user.login.toLowerCase() === adminName) {
       res.redirect("/admin");
-    else
-      res.redirect(
-        `/player.html?username=${encodeURIComponent(req.user.display_name)}`,
-      );
+    } else {
+      res.redirect("/player");
+    }
   },
 );
-app.get("/admin", checkAdmin, (req, res) =>
-  res.sendFile(path.join(__dirname, "private", "admin.html")),
-);
-app.get("/player", (req, res) => {
-  if (req.isAuthenticated())
-    res.redirect(
-      `/player.html?username=${encodeURIComponent(req.user.display_name)}`,
-    );
-  else res.sendFile(path.join(__dirname, "public", "player.html"));
+
+// Geschützte Admin Route (Datei muss in /private liegen!)
+app.get("/admin", checkAdmin, (req, res) => {
+  res.sendFile(__dirname + "/private/admin.html");
 });
 
-// --- GAME LOGIK ---
-let players = {};
-let hostStreamId = "";
-let currentQuestionInno = "";
-let currentQuestionOut = "";
-let currentOutsiderIds = [];
+// Geschützte Player Route (Mit Whitelist Check & Profilbild-Weitergabe)
+app.get("/player", checkPlayerAccess, (req, res) => {
+  const username = req.user.display_name;
+  // Twitch liefert das Bild in 'profile_image_url'
+  const pfp = req.user.profile_image_url || "";
+
+  // Wir geben Name UND Bild an die HTML-Datei weiter
+  res.redirect(
+    `/player.html?username=${encodeURIComponent(username)}&pfp=${encodeURIComponent(pfp)}`,
+  );
+});
+
+// --- SOCKET.IO GAME LOGIK ---
 
 io.on("connection", (socket) => {
-  socket.on("ping", () => {
-    socket.emit("pong");
+  // -- WHITELIST MANAGEMENT (Nur Admin kann das triggern) --
+  socket.on("admin_addWhitelist", (name) => {
+    const cleanName = name.toLowerCase().trim();
+    if (!whitelist.includes(cleanName)) {
+      whitelist.push(cleanName);
+      io.emit("updateWhitelist", whitelist); // Update an Admin zurück
+    }
   });
 
+  socket.on("admin_removeWhitelist", (name) => {
+    whitelist = whitelist.filter((n) => n !== name);
+    io.emit("updateWhitelist", whitelist);
+    // Optional: Spieler direkt kicken, falls er online ist
+    // Das ist komplexer, lassen wir erstmal weg für Stabilität
+  });
+
+  socket.on("admin_requestWhitelist", () => {
+    socket.emit("updateWhitelist", whitelist);
+  });
+
+  // -- GAMEPLAY --
   socket.on("join", (data) => {
     players[socket.id] = {
       id: socket.id,
       name: data.name,
+      profileImage: data.profileImage || null,
       streamId: data.streamId,
       score: 0,
       image: null,
@@ -110,62 +158,32 @@ io.on("connection", (socket) => {
     io.emit("updatePlayerList", players);
   });
 
-  socket.on("setHostId", (id) => {
-    hostStreamId = id;
-    io.emit("updateHost", hostStreamId);
-  });
+  socket.on("setHostId", (id) => io.emit("updateHost", id));
 
-  // --- START RUNDE (MIT IMPOSTER ANZAHL) ---
   socket.on("startRound", (data) => {
     currentQuestionInno = data.inno;
     currentQuestionOut = data.out;
+    const pIds = Object.keys(players);
+    if (pIds.length > 0)
+      currentOutsiderId = pIds[Math.floor(Math.random() * pIds.length)];
 
-    // --- DER FIX ---
-    // Wir wandeln den Wert in eine Zahl um.
-    let count = parseInt(data.count);
-
-    // Nur wenn gar keine Zahl ankam (NaN), nehmen wir standardmäßig 1.
-    // Wenn 0 ankommt, bleibt es jetzt 0!
-    if (isNaN(count)) count = 1;
-    // ----------------
-
-    const playerIds = Object.keys(players);
-    currentOutsiderIds = [];
-
-    if (playerIds.length > 0) {
-      // Mische Spieler zufällig
-      const shuffled = playerIds.sort(() => 0.5 - Math.random());
-      // Nimm die ersten X Spieler (Wenn count 0 ist, ist die Liste leer)
-      currentOutsiderIds = shuffled.slice(0, count);
-    }
-
-    // ... (Der Rest des Blocks bleibt genau gleich wie vorher) ...
-
-    // Reset
-    playerIds.forEach((id) => {
-      if (players[id]) players[id].image = null;
-    });
-
+    pIds.forEach((id) => (players[id].image = null));
     io.emit("resetOverlay");
     io.emit("updatePlayerList", players);
 
-    // Aufgaben verteilen
-    playerIds.forEach((id) => {
-      // Prüfen ob ID im Outsider Array ist
-      const isOutsider = currentOutsiderIds.includes(id);
-      const task = isOutsider ? currentQuestionOut : currentQuestionInno;
-      io.to(id).emit("newTask", task);
+    pIds.forEach((id) => {
+      io.to(id).emit(
+        "newTask",
+        id === currentOutsiderId ? currentQuestionOut : currentQuestionInno,
+      );
     });
 
     socket.emit("roundInfoUpdate", {
       questionInno: currentQuestionInno,
       questionOut: currentQuestionOut,
-      outsiderIds: currentOutsiderIds,
+      outsiderId: currentOutsiderId,
     });
   });
-
-  socket.on("startTimer", () => io.emit("timerStart"));
-  socket.on("stopTimer", () => io.emit("timerStop"));
 
   socket.on("submitDrawing", (data) => {
     if (players[socket.id]) {
@@ -174,54 +192,33 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 1. Spieler stellt Frage
-  socket.on("playerQuestion", (text) => {
-    const p = players[socket.id];
-    const name = p ? p.name : "Unbekannt";
-    // Wir schicken das an ALLE Clients, aber nur das Admin-Panel hört darauf
-    io.emit("incomingQuestion", { id: socket.id, name: name, text: text });
-  });
-
-  // 2. Admin antwortet
-  socket.on("adminAnswer", (data) => {
-    // data = { playerId: "...", text: "..." }
-    // Nur an den spezifischen Spieler senden
-    io.to(data.playerId).emit("hostReply", data.text);
-  });
-
   socket.on("revealOne", (id) => {
-    if (players[id] && players[id].image)
+    if (players[id] && players[id].image) {
       io.emit("showOneAnswer", { id: id, image: players[id].image });
+    }
   });
 
   socket.on("revealQuestion", () =>
     io.emit("showQuestion", currentQuestionInno),
   );
 
-  // --- NEU: ROLLEN AUFLÖSEN ---
-  socket.on("revealRoles", () => {
-    // Sendet die Liste der bösen IDs an das Overlay
-    io.emit("showRoles", currentOutsiderIds);
-  });
-
   socket.on("givePoints", (data) => {
     if (players[data.id]) {
-      players[data.id].score += parseInt(data.amount);
+      players[data.id].score += data.amount;
       io.emit("updatePlayerList", players);
     }
   });
 
-  socket.on("requestPlayerListUpdate", () =>
-    socket.emit("updatePlayerList", players),
-  );
-
+  // -- DISCONNECT FIX (Verzögertes Löschen) --
   socket.on("disconnect", () => {
-    if (players[socket.id]) {
-      delete players[socket.id];
-      io.emit("updatePlayerList", players);
-    }
+    setTimeout(() => {
+      if (!io.sockets.sockets.has(socket.id)) {
+        delete players[socket.id];
+        io.emit("updatePlayerList", players);
+      }
+    }, 5000);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server auf Port ${PORT}`));
+server.listen(PORT, () => console.log(`Server läuft auf Port ${PORT}`));

@@ -140,7 +140,7 @@
       }
 
       #task {
-        color: #00ff88;
+        color: #a474ff;
         font-size: 1.2rem;
         margin: 5px 0 10px 0;
         min-height: 25px;
@@ -165,7 +165,7 @@
         height: 50px;
       }
       .btn-send {
-        background: #00ff88;
+        background: #a474ff;
         color: black;
         flex: 2;
       }
@@ -462,7 +462,11 @@
           );
           // Wir senden einfach nochmal den Join-Befehl
           // streamId ist global gespeichert, also nutzen wir die gleiche
-          socket.emit("join", { name: name, streamId: myStreamId });
+          socket.emit("join", {
+            name: name,
+            streamId: myStreamId,
+            profileImage: myTwitchImage, // <--- Das ist neu!
+          });
         }
       });
 
@@ -476,12 +480,23 @@
       const ctx = canvas.getContext("2d");
       let drawing = false;
 
+      // NEU: Variable für das Bild
+      let myTwitchImage = null;
+
       window.onload = function () {
         const urlParams = new URLSearchParams(window.location.search);
         const twitchName = urlParams.get("username");
+        // NEU: Bild aus URL lesen
+        const twitchPfp = urlParams.get("pfp");
+
         if (twitchName) {
           document.getElementById("username").value = twitchName;
           document.getElementById("username").disabled = true;
+        }
+
+        // NEU: Bild speichern
+        if (twitchPfp) {
+          myTwitchImage = twitchPfp;
         }
       };
 
@@ -495,7 +510,11 @@
           const vdoUrl = `https://vdo.ninja/?push=${myStreamId}&select&webcam`;
           document.getElementById("my-cam-preview").innerHTML =
             `<iframe class="pusher" src="${vdoUrl}" allow="autoplay; camera; microphone"></iframe>`;
-          socket.emit("join", { name: name, streamId: myStreamId });
+          socket.emit("join", {
+            name: name,
+            streamId: myStreamId,
+            profileImage: myTwitchImage, // <--- Das ist neu!
+          });
         } else {
           alert("Bitte Namen eingeben!");
         }

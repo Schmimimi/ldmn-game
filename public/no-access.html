@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="de">
+    <head>
+        <meta charset="UTF-8" />
+        <title>LÜGEN DARF MAN NICHT - Spectator Lounge</title>
+        <link rel="stylesheet" href="style.css" />
+        <script src="/socket.io/socket.io.js"></script>
+        <style>
+            /* --- CSS (Gekürzt auf das Wichtigste) --- */
+            body {
+                margin: 0;
+                height: 100vh;
+                width: 100vw;
+                background: #050505;
+                color: white;
+                display: grid;
+                grid-template-columns: 280px 1fr auto; /* Sidebar | Stream | Chat */
+                grid-template-rows: 60px 1fr;
+                overflow: hidden;
+                font-family: "Rubik", sans-serif;
+            }
+            .header {
+                grid-column: 1 / -1;
+                background: #130821;
+                border-bottom: 1px solid #9146ff;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0 20px;
+                z-index: 10;
+            }
+            .sidebar {
+                background: #0e0e10;
+                border-right: 1px solid #333;
+                overflow-y: auto;
+            }
+
+            /* AVATAR STYLE */
+            .avatar {
+                width: 40px;
+                height: 40px;
+                background: #333;
+                border-radius: 50%;
+                overflow: hidden;
+                flex-shrink: 0;
+                border: 2px solid transparent;
+            }
+            .avatar img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+            .channel-item.active .avatar {
+                border-color: #9146ff;
+            }
+
+            .channel-item {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 10px;
+                cursor: pointer;
+                transition: background 0.2s;
+                color: #efeff1;
+            }
+            .channel-item:hover {
+                background: rgba(145, 70, 255, 0.2);
+            }
+            .channel-item.active {
+                background: #9146ff;
+                color: white;
+            }
+
+            .main-stage {
+                background: black;
+            }
+            #chatContainer {
+                width: 340px;
+                background: #0e0e10;
+                border-left: 1px solid #333;
+                transition: width 0.3s;
+            }
+            #chatContainer.hidden {
+                width: 0;
+                display: none;
+            }
+            iframe {
+                width: 100%;
+                height: 100%;
+                border: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1
+                style="
+                    font-size: 1.2rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                "
+            >
+                <span
+                    style="
+                        background: red;
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        font-size: 0.7rem;
+                    "
+                    >LIVE</span
+                >
+                Spectator Lounge
+            </h1>
+            <div style="display: flex; gap: 10px">
+                <button
+                    onclick="toggleChat()"
+                    style="
+                        background: #9146ff;
+                        border: none;
+                        color: white;
+                        padding: 5px 10px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                    "
+                >
+                    Chat
+                </button>
+                <a
+                    href="/"
+                    style="
+                        color: #ccc;
+                        text-decoration: none;
+                        border: 1px solid #444;
+                        padding: 5px 10px;
+                        border-radius: 5px;
+                    "
+                    >Logout</a
+                >
+            </div>
+        </div>
+
+        <div class="sidebar" id="sidebarList"></div>
+        <div class="main-stage" id="stageContainer"></div>
+        <div id="chatContainer">
+            <iframe id="twitchChat" src="" height="100%" width="100%"></iframe>
+        </div>
+
+        <script>
+            const socket = io({ reconnection: true });
+
+            // DEINE CONFIG
+            const PARENT_DOMAIN =
+                "lugendarfmannichtsagen--schmilley.replit.app";
+            const HOST_NAME = "schmilley";
+            // Platzhalter Bild für den Host (da er sich nicht als Player einloggt)
+            const HOST_IMG =
+                "https://static-cdn.jtvnw.net/jtv_user_pictures/0f1ad9c9-40b3-4525-83f1-b38dbceaf5c6-profile_image-70x70.png";
+
+            let currentPlayers = {};
+            let activeChannel = "";
+
+            function toggleChat() {
+                document
+                    .getElementById("chatContainer")
+                    .classList.toggle("hidden");
+            }
+
+            function renderSidebar() {
+                const sb = document.getElementById("sidebarList");
+                sb.innerHTML = "";
+
+                // 1. HOST
+                const isHost =
+                    activeChannel.toLowerCase() === HOST_NAME.toLowerCase();
+                sb.innerHTML += `
+                <div style="padding:15px 10px 5px; font-size:0.8rem; color:#888; font-weight:bold;">MODERATION</div>
+                <div class="channel-item ${isHost ? "active" : ""}" onclick="switchChannel('${HOST_NAME}')">
+                    <div class="avatar"><img src="${HOST_IMG}"></div>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-weight:bold;">${HOST_NAME}</span>
+                        <span style="font-size:0.8rem; opacity:0.7;">Host</span>
+                    </div>
+                </div>
+                <div style="padding:15px 10px 5px; font-size:0.8rem; color:#888; font-weight:bold;">TEILNEHMER</div>
+            `;
+
+                // 2. SPIELER
+                Object.values(currentPlayers).forEach((p) => {
+                    const isActive =
+                        activeChannel.toLowerCase() === p.name.toLowerCase();
+                    // Fallback Bild falls keins da ist (ui-avatars)
+                    const imgUrl =
+                        p.profileImage ||
+                        `https://ui-avatars.com/api/?name=${p.name}&background=random`;
+
+                    sb.innerHTML += `
+                    <div class="channel-item ${isActive ? "active" : ""}" onclick="switchChannel('${p.name}')">
+                        <div class="avatar"><img src="${imgUrl}"></div>
+                        <div style="display:flex; flex-direction:column;">
+                            <span style="font-weight:bold;">${p.name}</span>
+                            <span style="font-size:0.8rem; opacity:0.7;">Punkte: ${p.score}</span>
+                        </div>
+                    </div>
+                `;
+                });
+            }
+
+            function switchChannel(name) {
+                if (!name || activeChannel.toLowerCase() === name.toLowerCase())
+                    return;
+                activeChannel = name;
+
+                // Stream Embed
+                document.getElementById("stageContainer").innerHTML =
+                    `<iframe src="https://player.twitch.tv/?channel=${name}&parent=${PARENT_DOMAIN}&muted=false" allowfullscreen></iframe>`;
+
+                // Chat Embed
+                document.getElementById("twitchChat").src =
+                    `https://www.twitch.tv/embed/${name}/chat?parent=${PARENT_DOMAIN}&darkpopout`;
+
+                renderSidebar();
+            }
+
+            socket.on("updatePlayerList", (list) => {
+                currentPlayers = list;
+                renderSidebar();
+            });
+
+            // Start
+            switchChannel(HOST_NAME);
+            socket.emit("requestPlayerListUpdate");
+        </script>
+    </body>
+</html>
