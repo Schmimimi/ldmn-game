@@ -237,6 +237,17 @@ io.on("connection", (socket) => {
     io.emit("showQuestion", currentQuestionInno),
   );
 
+// --- TIMER LOGIK (Das hat gefehlt!) ---
+  socket.on("startTimer", () => {
+    // Sagt ALLEN (also auch dem Overlay): Startet den 2-Minuten Timer!
+    io.emit("timerStart"); 
+  });
+
+  socket.on("stopTimer", () => {
+    // Sagt allen: Timer abbrechen!
+    io.emit("timerStop");
+  });
+  
   socket.on("givePoints", (data) => {
     if (players[data.id]) {
       players[data.id].score += data.amount;
