@@ -567,6 +567,10 @@
         }
       }
       socket.on("hostReply", (text) => {
+        const audio = new Audio('/notification.mp3');
+        audio.volume = 0.5;
+        audio.play().catch(e => console.log("Audio Autoplay blockiert", e));
+        
         const container = document.getElementById("host-messages");
         if (container.innerHTML.includes("Keine Nachrichten"))
           container.innerHTML = "";
