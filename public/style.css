@@ -241,27 +241,26 @@ iframe { width: 100%; height: 100%; border: none; }
 /* --- TIMER STYLE --- */
 #timer-overlay {
     position: absolute;
-    top: 20%; /* Etwas unterhalb der Header-Zeile */
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(220, 0, 0, 0.9); /* Warn-Rot */
+    top: 12vh; /* Höhe anpassen, damit er zwischen Header und Frage passt */
+    left: 4vh; /* Exakt der gleiche Abstand wie das Main-Grid Padding */
+    transform: translateY(-50%); /* Nur noch vertikal zentrieren */
+    background: rgba(220, 0, 0, 0.9);
     color: white;
-    padding: 10px 40px;
-    font-size: 4rem;
+    padding: 10px 30px; /* Etwas kompakter */
+    font-size: 3rem;    /* Etwas kleiner, damit es links gut aussieht */
     font-family: 'Rubik', sans-serif;
     font-weight: 700;
-    border-radius: 15px;
-    box-shadow: 0 0 50px rgba(255, 0, 0, 0.6);
+    border-radius: 12px;
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
     z-index: 100;
     opacity: 0;
-    pointer-events: none; /* Klickbar drunter */
-    transition: opacity 0.5s ease-in-out, transform 0.5s ease;
+    pointer-events: none;
+    transition: opacity 0.5s ease-in-out;
     border: 2px solid white;
 }
 
 #timer-overlay.active {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1.1);
     animation: pulse 1s infinite alternate;
 }
 
