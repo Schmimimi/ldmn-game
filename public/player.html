@@ -507,7 +507,7 @@
         if (name) {
           document.getElementById("login").style.display = "none";
           document.getElementById("game").style.display = "flex";
-          const vdoUrl = `https://vdo.ninja/?push=${myStreamId}&select&webcam`;
+          const vdoUrl = `https://vdo.ninja/?push=${myStreamId}&select&webcam&noaudio&width=1280&height=720&framerate=30`;
           document.getElementById("my-cam-preview").innerHTML =
             `<iframe class="pusher" src="${vdoUrl}" allow="autoplay; camera; microphone"></iframe>`;
           socket.emit("join", {
