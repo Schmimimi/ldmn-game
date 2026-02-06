@@ -8,6 +8,8 @@ const session = require("express-session");
 const path = require("path");
 
 const app = express();
+app.enable('trust proxy');
+
 const server = http.createServer(app);
 
 // FIX: Ping/Pong erhöhen gegen Verbindungsabbrüche
